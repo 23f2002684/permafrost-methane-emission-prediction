@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Methane Predictor</title>
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap');
+
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: #f0f2f5;
+            color: #333;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 1rem;
+        }
+
+        .container {
+            background-color: white;
+            padding: 2rem 3rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 600px;
+            text-align: center;
+        }
+
+        header h1 {
+            color: #1a237e;
+            margin-bottom: 0.5rem;
+        }
+
+        header p {
+            color: #555;
+            margin-bottom: 2rem;
+        }
+
+        .uploader-container {
+            border: 2px dashed #90a4ae;
+            border-radius: 8px;
+            padding: 2rem;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        .uploader-container:hover {
+            background-color: #eceff1;
+        }
+
+        #file-label {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 1rem;
+            cursor: pointer;
+        }
+
+        #file-label span {
+            font-weight: 700;
+            color: #37474f;
+        }
+
+        #image-preview {
+            margin-top: 2rem;
+        }
+
+        #image-preview img {
+            max-width: 100%;
+            max-height: 300px;
+            border-radius: 8px;
+            border: 1px solid #ddd;
+        }
+
+        #result-container {
+            margin-top: 2rem;
+        }
+
+        #result-box {
+            padding: 1.5rem;
+            border-radius: 8px;
+            font-size: 1.2rem;
+            font-weight: 700;
+        }
+
+        #result-box.high-risk {
+            background-color: #ffebee;
+            border: 1px solid #e57373;
+            color: #c62828;
+        }
+
+        #result-box.low-risk {
+            background-color: #e8f5e9;
+            border: 1px solid #81c784;
+            color: #2e7d32;
+        }
+        
+        #result-box.error {
+            background-color: #fff3e0;
+            border: 1px solid #ffb74d;
+            color: #e65100;
+        }
+
+        #confidence-text {
+            font-size: 1rem;
+            font-weight: 400;
+            margin-top: 0.5rem;
+            color: #555;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        #spinner {
+            border: 6px solid #f3f3f3;
+            border-top: 6px solid #3498db;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 2rem auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🛰️ Permafrost Methane Predictor</h1>
+            <p>Upload a satellite image (PNG/JPG) to predict its methane emission risk.</p>
+        </header>
+
+        <main>
+            <div class="uploader-container">
+                <input type="file" id="file-input" accept="image/png, image/jpeg" hidden>
+                <label for="file-input" id="file-label">
+                    <img src="https://www.svgrepo.com/show/532321/cloud-upload.svg" alt="Upload Icon" width="50">
+                    <span>Click to Upload an Image</span>
+                </label>
+            </div>
+
+            <div id="image-preview" class="hidden"></div>
+
+            <div id="result-container" class="hidden">
+                <h2>Prediction Result</h2>
+                <div id="result-box">
+                    <p id="prediction-text"></p>
+                    <p id="confidence-text"></p>
+                </div>
+            </div>
+            
+            <div id="spinner" class="hidden"></div>
+
+        </main>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const fileInput = document.getElementById('file-input');
+            const imagePreview = document.getElementById('image-preview');
+            const resultContainer = document.getElementById('result-container');
+            const resultBox = document.getElementById('result-box');
+            const predictionText = document.getElementById('prediction-text');
+            const confidenceText = document.getElementById('confidence-text');
+            const spinner = document.getElementById('spinner');
+
+            fileInput.addEventListener('change', (event) => {
+                const file = event.target.files[0];
+                if (!file) {
+                    return;
+                }
+
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    imagePreview.innerHTML = `<img src="${e.target.result}" alt="Image preview">`;
+                    imagePreview.classList.remove('hidden');
+                };
+                reader.readAsDataURL(file);
+
+                resultContainer.classList.add('hidden');
+                spinner.classList.remove('hidden');
+
+                const formData = new FormData();
+                formData.append('file', file);
+
+                fetch('/predict/', {
+                    method: 'POST',
+                    body: formData,
+                })
+                .then(response => response.json())
+                .then(data => {
+                    spinner.classList.add('hidden');
+                    
+                    if (data.error) {
+                        predictionText.textContent = `Error: ${data.error}`;
+                        confidenceText.textContent = '';
+                        resultBox.className = 'error';
+                    } else {
+                        predictionText.textContent = `Prediction: ${data.prediction}`;
+                        confidenceText.textContent = `Confidence: ${data.confidence}`;
+
+                        resultBox.className = ''; // Clear previous classes
+                        if (data.prediction.toLowerCase().includes('high')) {
+                            resultBox.classList.add('high-risk');
+                        } else {
+                            resultBox.classList.add('low-risk');
+                        }
+                    }
+                    resultContainer.classList.remove('hidden');
+                })
+                .catch(error => {
+                    spinner.classList.add('hidden');
+                    predictionText.textContent = 'An unexpected error occurred. Check the console.';
+                    confidenceText.textContent = '';
+                    resultBox.className = 'error';
+                    console.error('Error:', error);
+                    resultContainer.classList.remove('hidden');
+                });
+            });
+        });
+    </script>
+</body>
+</html>
