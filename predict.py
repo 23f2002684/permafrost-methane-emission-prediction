@@ -4,31 +4,23 @@ from torchvision import transforms, models
 from PIL import Image
 
 # --- Configuration ---
-MODEL_PATH = 'models/methane_classifier_png.pth'
+MODEL_PATH = 'models/methane_classifier_final.pth' # Use the new model file
 NUM_CLASSES = 3
 IMG_SIZE = 224
 CLASS_NAMES = {0: "Low Emission Risk", 1: "Moderate Emission Risk", 2: "High Emission Risk"}
 
 # --- Load Model ---
-# Create the ResNet18 structure
-model = models.resnet18(weights=None) 
-# Re-attach our custom final layer
+# Must match the architecture used in train.py (ResNet34)
+model = models.resnet34(weights=None) 
 num_ftrs = model.fc.in_features
 model.fc = nn.Linear(num_ftrs, NUM_CLASSES)
 
-# Load the weights of YOUR trained model
 device = torch.device("cpu")
-# --- THIS IS THE LINE TO CHANGE ---
-# OLD: model.load_state_dict(torch.load(MODEL_PATH, map_location=device))
-# NEW:
 model.load_state_dict(torch.load(MODEL_PATH, map_location=device, weights_only=True))
 model.eval()
 
-# --- Preprocessing and Prediction Function (No changes needed here) ---
+# --- Preprocessing and Prediction Function ---
 def predict_png(image_path):
-    """
-    Loads a PNG image, preprocesses it, and returns the predicted class and confidence.
-    """
     transform = transforms.Compose([
         transforms.Resize((IMG_SIZE, IMG_SIZE)),
         transforms.ToTensor(),
